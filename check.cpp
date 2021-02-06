@@ -32,12 +32,9 @@ arma::mat toMatrix(vector<double> testV)
 }
 
 
-
-
-
-int main()
+int getTime(int n)
 {
-    const int n = 2048*2*1;
+    //const int n = 1024*2*2;
     arma::mat test;
     test.randn(n, n);
     test *= test.t();
@@ -45,20 +42,40 @@ int main()
 
     vector<double> testV = toVector(test);
 
-    double b[n], diag[n];
-    int next[n];
+    //double b[n], diag[n];
+    double *diag = new double[n];
+    double *b    = new double[n];
+    int *next = new int[n];
 
     int nrank, nNow = n;
 
-    cout << "Init done " << testV[5]<< endl;
+    //cout << "Init done " << testV[5]<< endl;
     auto begin = std::chrono::steady_clock::now();
-    //arma::mat C =  arma::inv_sympd(test);
+    arma::mat C =  arma::inv_sympd(test);
+    //arma::mat C =  test.i();
 
-    sqminl_(testV.data(), b, &nNow, &nrank, diag, next);
+    //sqminl_(testV.data(), b, &nNow, &nrank, diag, next);
 
     auto end = std::chrono::steady_clock::now();
 
-    std::cout << "Time difference = " << std::chrono::duration_cast<std::chrono::milliseconds>(end - begin).count() << "[ms]" << std::endl;
+    delete [] diag;
+    delete [] b;
+    delete [] next;
+
+    return std::chrono::duration_cast<std::chrono::milliseconds>(end - begin).count();
+}
+
+
+
+
+
+int main(int argc, char **argv)
+{
+    for(int n = 128; n <= 18000; n *= 2) {
+        int t =  getTime(n);
+        cout << n <<" : " << t << endl;
+    //std::cout << "Time difference = " << std::chrono::duration_cast<std::chrono::milliseconds>(end - begin).count() << "[ms]" << std::endl;
+    }
 
     //arma::mat C =  test.i();
     //return 0;
