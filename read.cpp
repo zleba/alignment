@@ -124,23 +124,6 @@ vector<map<int,int>> getIndexes(const  vector<vector<Hit>>  &data)
 
 double Rand() { return rand()/(RAND_MAX+0.);}
 
-//Generate random data for testing
-vector<vector<Hit>> generateData(int nTracks, int nHits, int nLoc, int nGl)
-{
-    vector<vector<Hit>> data(nTracks);
-    for(auto & dd : data) {
-        dd.resize(nHits);
-        for(auto & d : dd) {
-            d.res = Rand();
-            d.sigma = 0.10;
-            d.gl     = { Rand() };
-            d.glIndx = { 10};
-            d.loc     = { Rand(), Rand() };
-            d.locIndx = { 1, 2};
-        }
-    }
-    return data;
-}
 
 double Gauss()
 {
@@ -163,12 +146,8 @@ vector<vector<Hit>> generateDataToy(int nTracks, vector<double> parsIn)
         vector<double> v(parsIn.size());
         for(int i = 0; i < v.size(); ++i)
             v[i] = a + i*s + Gauss() + parsIn[i];
-        //v[0] = a + 0*s + Gauss() + 0.3;
-        //v[1] = a + 1*s + Gauss() + 0.2;
-        //v[2] = a + 2*s + Gauss() - 0.5;
 
-        //double sN = (v[2] - v[0]) / 2;
-        //double aN = (v[0] + v[1] + v[2]) / 3 - sN;
+        //very simple tracking
         double sN = (v.back() - v.front()) / (v.size()-1);
         double aN = v.front();
 
@@ -198,7 +177,7 @@ vector<vector<Hit>> convertData(const vector<pair<vector<int>,vector<float>>> &d
         while(i < d.first.size()) {
             Hit hit;
             assert(d.first[i] == 0);
-            hit.res = d.second[i];
+            hit.res = -d.second[i];
             ++i;
             while(d.first[i] > 0) { //Local parameters
                 hit.loc.push_back(d.second[i]);
@@ -265,7 +244,6 @@ double Fitter::getChi2(arma::vec rGl)
         auto & dd = data[itr];
 
         arma::vec qVec = - Gamma[itr].i() * beta[itr];
-        //if(rGl.n_rows > 0) qVec -= G[itr].t()*rGl;
 
         //cout << "qVecNorm : " << arma::norm(qVec) << endl;
 
@@ -290,8 +268,8 @@ double Fitter::getChi2(arma::vec rGl)
             chi2 += pow(z/d.sigma, 2);
             ++nPt;
         }
-        //nPt -= 2;
-        nPt -= dd[0].loc.size();
+
+        nPt -= dd[0].loc.size(); //subtract local degrees of freedom
     }
     cout << "chi2 = " << chi2 << " "<< chi2/nPt << endl;
     return chi2;
@@ -382,30 +360,30 @@ arma::vec Fitter::reduceData(const vector<vector<Hit>> &dataNow, const vector<ma
 
             double sigmaInv = 1/(d.sigma*d.sigma);
 
-            //Fill C1
+            //Fill C1 (stable)
             for(int i = 0; i < d.gl.size(); ++i)
             for(int j = 0; j < d.gl.size(); ++j) {
                 C1(glIndx.at(d.glIndx[i]), glIndx.at(d.glIndx[j])) += d.gl[i]*d.gl[j] *sigmaInv;
             }
 
-            //Fill Gamma
+            //Fill Gamma (stable)
             for(int i = 0; i < d.loc.size(); ++i)
             for(int j = 0; j < d.loc.size(); ++j) {
                 Gamma[itr](locIndx.at(d.locIndx[i]), locIndx.at(d.locIndx[j])) += d.loc[i]*d.loc[j] *sigmaInv;
             }
 
-            //Fill G
+            //Fill G (stable)
             for(int i = 0; i < d.gl.size(); ++i)
             for(int j = 0; j < d.loc.size(); ++j) {
                 G[itr](glIndx.at(d.glIndx[i]), locIndx.at(d.locIndx[j])) += d.gl[i]*d.loc[j] *sigmaInv;
             }
 
-            //Fill beta
+            //Fill beta (res-dep)
             for(int i = 0; i < d.loc.size(); ++i) {
                 beta[itr](locIndx.at(d.locIndx[i])) += d.loc[i]*d.res *sigmaInv;
             }
 
-            //Fill g1
+            //Fill g1 (res-dep)
             for(int i = 0; i < d.gl.size(); ++i) {
                 g1(glIndx.at(d.glIndx[i])) += d.gl[i]*d.res *sigmaInv;
             }
@@ -452,6 +430,11 @@ arma::vec Fitter::reduceData(const vector<vector<Hit>> &dataNow, const vector<ma
 
 
     //cout << ConM << endl; 
+    arma::vec eigval;
+    arma::mat eigvec;
+    arma::eig_sym(eigval, eigvec, Ce);
+    cout << "Helenka " << eigval << endl;
+
 
     //arma::vec r = - C.i()  * g;
     arma::vec r = - Ce.i() * ge;
